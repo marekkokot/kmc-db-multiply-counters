@@ -6,7 +6,7 @@
 uint64_t read_counter(FILE* file, uint64_t counter_size)
 {
 	uint64_t res{};
-	char data[8];
+	uint8_t data[8];
 	fread(data, 1, counter_size, file);
 	for (uint64_t i = 0; i < counter_size; ++i)
 	{
@@ -18,7 +18,7 @@ uint64_t read_counter(FILE* file, uint64_t counter_size)
 
 void write_counter(FILE* file, uint64_t c, uint64_t counter_size)
 {
-	char data[8];
+	uint8_t data[8];
 	for (uint64_t i = 0; i < counter_size; ++i)
 	{
 		data[i] = c >> (8 * i);		
@@ -71,6 +71,7 @@ int multiply_counters(const std::string& kmcDbPath, uint64_t total_kmers, uint64
 	{
 		my_fseek(file, suffix_bytes, SEEK_CUR); //shift to counter
 		auto c = read_counter(file, counter_size);
+		std::cerr << c << " ";
 		c *= multiplier;
 
 		if (c > highest_count)
@@ -83,6 +84,7 @@ int multiply_counters(const std::string& kmcDbPath, uint64_t total_kmers, uint64
 			c = max_legal;
 			++n_corrected;
 		}
+		std::cerr << c << "\n";
 
 		my_fseek(file, -(int64_t)counter_size, SEEK_CUR); //shift back to set counter
 		write_counter(file, c, counter_size);
@@ -90,6 +92,14 @@ int multiply_counters(const std::string& kmcDbPath, uint64_t total_kmers, uint64
 	if (n_corrected)
 	{
 		std::cerr << "Warning: " << n_corrected << " counters was set to " << max_legal << " because of override\n";
+	}
+	if (lowest_count < min_count)
+	{
+		std::cerr << "Warning: after multiplication some values are lower than min_count set in config! This may lead to incorrect run of some tools. Maybe this tool should be extendet to set new min value in kmc db configuration file\n";
+	}
+	if (highest_count > max_count)
+	{
+		std::cerr << "Warning: after multiplication some values are higher than max_count set in config! This may lead to incorrect run of some tools. Maybe this tool should be extendet to set new max value in kmc db configuration file\n";
 	}
 	//have we reached the end marker?
 	fread((void*)marker.data(), 1, 4, file);
