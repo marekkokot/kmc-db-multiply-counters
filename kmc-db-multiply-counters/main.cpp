@@ -26,12 +26,6 @@ void write_counter(FILE* file, uint64_t c, uint64_t counter_size)
 	fwrite(data, 1, counter_size, file);
 }
 
-uint64_t get_max_value_to_store_on_n_bytes(uint64_t n)
-{
-	uint64_t res = (1ull << 8 * n) - 1;
-	return res;
-}
-
 int multiply_counters(const std::string& kmcDbPath, uint64_t total_kmers, uint64_t suffix_len, uint64_t counter_size, uint64_t min_count, uint64_t max_count, double multiplier)
 {
 	auto _kmcDbPath = kmcDbPath + ".kmc_suf";
@@ -62,45 +56,35 @@ int multiply_counters(const std::string& kmcDbPath, uint64_t total_kmers, uint64
 
 	auto suffix_bytes = suffix_len / 4;
 	
-	uint64_t lowest_count = std::numeric_limits<uint64_t>::max();
-	uint64_t highest_count = 0;
-
-	uint64_t max_legal = get_max_value_to_store_on_n_bytes(counter_size);
-	uint64_t n_corrected{};
+	uint64_t n_above{}, n_below{};
 	for (uint64_t i = 0; i < total_kmers; ++i)
 	{
 		my_fseek(file, suffix_bytes, SEEK_CUR); //shift to counter
 		auto c = read_counter(file, counter_size);
-		std::cerr << c << " ";
+		//std::cerr << c << " ";
 		c *= multiplier;
 
-		if (c > highest_count)
-			highest_count = c;
-		if (c < lowest_count)
-			lowest_count = c;
-
-		if (c > max_legal)
+		if (c < min_count)
 		{
-			c = max_legal;
-			++n_corrected;
+			c = min_count;
+			++n_below;
 		}
-		std::cerr << c << "\n";
+		if (c > max_count)
+		{
+			c = max_count;
+			++n_above;
+		}
+
+		//std::cerr << c << "\n";
 
 		my_fseek(file, -(int64_t)counter_size, SEEK_CUR); //shift back to set counter
 		write_counter(file, c, counter_size);
 	}
-	if (n_corrected)
-	{
-		std::cerr << "Warning: " << n_corrected << " counters was set to " << max_legal << " because of override\n";
-	}
-	if (lowest_count < min_count)
-	{
-		std::cerr << "Warning: after multiplication some values are lower than min_count set in config! This may lead to incorrect run of some tools. Maybe this tool should be extendet to set new min value in kmc db configuration file\n";
-	}
-	if (highest_count > max_count)
-	{
-		std::cerr << "Warning: after multiplication some values are higher than max_count set in config! This may lead to incorrect run of some tools. Maybe this tool should be extendet to set new max value in kmc db configuration file\n";
-	}
+	if (n_above)	
+		std::cerr << "Warning: " << n_above << " counters was set to " << max_count << " because of overflow\n";
+	if (n_below)
+		std::cerr << "Warning: " << n_below << " counters was set to " << min_count << " because of underflow\n";
+	
 	//have we reached the end marker?
 	fread((void*)marker.data(), 1, 4, file);
 	if (marker != "KMCS")
