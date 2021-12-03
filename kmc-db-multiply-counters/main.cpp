@@ -87,7 +87,10 @@ int multiply_counters(const std::string& kmcDbPath, uint64_t total_kmers, uint64
 		my_fseek(file, -(int64_t)counter_size, SEEK_CUR); //shift back to set counter
 		write_counter(file, c, counter_size);
 	}
-
+	if (n_corrected)
+	{
+		std::cerr << "Warning: " << n_corrected << " counters was set to " << max_legal << " because of override\n";
+	}
 	//have we reached the end marker?
 	fread((void*)marker.data(), 1, 4, file);
 	if (marker != "KMCS")
